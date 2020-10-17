@@ -12,10 +12,6 @@
 ## veg pca to show disturbance
 ## morans i for spatial autocorrelation?
 
-## NExt: start importing the analysis step by step to address the specific issues.
-
-# calculating dung beetle diversity
-
 # libraries and sources ----
 rm(list=ls()) ##Clear memory
 setwd("C:/Data/PhD/Analysis/Dungbeetles")
@@ -27,6 +23,72 @@ require(BiodiversityR)
 require(vegan)
 require(plotrix)
 library(iNEXT)
+library(tidyverse)
+
+## Read in all datasets and combine ----
+
+# #
+weather <- read.csv("C://Data/PhD/Processed_data/Dungbeetles/DB_div_weather.csv")
+site_data <- read.csv("C://Data/PhD/Processed_data/Site_data/sites_elev_dist_coords.csv")
+soil <- read.csv("C://Data/PhD/Processed_data/Soil/Soil_data.csv") ## not much point using soil data as not enough samples
+
+head(weather)
+head(site_data)
+head(soil)
+colnames(weather)[1] <- "Site"
+# edit site names so they match
+levels(weather$Site)[levels(weather$Site)=="T6-850"] <- "MIN-B"
+levels(weather$Site)[levels(weather$Site)=="T7-1350"] <- "MIN-A"
+levels(weather$Site)[levels(weather$Site)=="CH-400"] <- "MIN-C"
+levels(weather$Site)[levels(weather$Site)=="T1-650"] <- "CCR-B"
+levels(weather$Site)[levels(weather$Site)=="T2-800"] <- "CCR-A"
+levels(weather$Site)[levels(weather$Site)=="T5-250"] <- "CCR-C"
+levels(weather$Site)[levels(weather$Site)=="T2-2150"] <- "MXD-A"
+levels(weather$Site)[levels(weather$Site)=="T10-100"] <- "MXD-B"
+levels(weather$Site)[levels(weather$Site)=="T3-1800"] <- "MXD-C"
+
+
+DB_merge1 <- merge(site_data,weather,by="Site")
+DB_merge2 <- merge(DB_merge1,soil,by="Site")
+head(DB_merge2)
+## as we prepare other datasets later, they can be added to dataframe ----
+# Edited alpha file in Excel to separate Site_rank into rank and site columns
+# Also edited richness output to replace spaces with underscores and remove % and () from colnames
+
+# colnames(veg)[1] <- "Site"
+# colnames(rich)[1] <- "Site"
+# colnames(alpha)[1] <- "Site"
+
+# newalphasite <- str_split_fixed(alpha$Site, ".",3) # split Site column, to get site values without Rank. infront
+# alpha$Site <- newalphasite[,3]
+#
+# alpha$Site <- as.factor(alpha$Site)
+# levels(alpha$Site)
+# levels(alpha$Site)[levels(alpha$Site)=="MinD-B"] <- "MIN-B"
+# levels(alpha$Site)[levels(alpha$Site)=="MinD-A"] <- "MIN-A"
+# levels(alpha$Site)[levels(alpha$Site)=="MinD-C"] <- "MIN-C"
+
+
+#
+# #
+# DB_merge1 <- merge(alpha,site_data,by="Site")
+# DB_merge2 <- merge(DB_merge1,veg,by="Site")
+# DB_merge3 <- merge(DB_merge2,weather,by="Site")
+# DB_merge4 <- merge(DB_merge3,abund,by="Site")
+# DB_merge5 <- merge(DB_merge4,soil,by="Site")
+# DB_merge6 <- merge(DB_merge5,Estqs,by="Site")
+# DB_allvars <- merge(DB_merge6,rich,by="Site")
+# 
+# head(DB_allvars)
+##write.csv(DB_allvars,"C://Data/PhD/Processed_data/Dungbeetles/DB_div_allvars.csv")
+
+# 
+# table1 <-data.frame(as.character("text"),as.character("text"),0,0,0)
+# names(table1) <- c("Variable 1","Variable 2", "Rho", "Rho 95% LCI", "Rho 95% UCI")
+# str(table1)
+# table1 <- rbind(table1,c(as.character("test1"),as.character("test2"),0.23,0.2,0.4))
+# calculating dung beetle diversity
+
 
 ## Code for plots -----
 ## diversity profile
@@ -70,6 +132,8 @@ length(which(db.mat>"2"))
 p1 <- db.mat/sum(db.mat) #turned counts into proportions
 qs1 <- c(0,seq(from = 0.5, to = 2,by=0.1),Inf)# for calculating
 qs2 <- c(1,seq(from = 2, to = 8,by=0.4),16) # for plotting
+# qs1 <- c(0,0.5,1,2,Inf)# for calculating
+# qs2 <- c(1,2,4,8,16) # for plotting
 alpha<- subcommunity.alpha.bar(populations=p1,qs=qs1) # calculate alpha diversity profile (raw values at total sample size)
 str(alpha)
 #write.csv(alpha,"C://Data/PhD/Processed_data/Dungbeetles/Diversity/alpha.csv")
@@ -79,6 +143,20 @@ str(alpha)
 par(mar=c(4.5,4,1,1))
 gradplot(measure=alpha,y=c("Effective number of species"),colgrad=cf,legcol=cf1)
 dev.off()
+
+## add alpha data main table ----
+
+alphadf <- as.data.frame(alpha)
+newalphasite <- str_split_fixed(rownames(alphadf), ".",3) # split Site column, to get site values without Rank. infront
+alphadf$Site <- newalphasite[,3]
+alphadf$Site <- as.factor(alphadf$Site)
+levels(alphadf$Site)
+levels(alphadf$Site)[levels(alphadf$Site)=="MinD-B"] <- "MIN-B"
+levels(alphadf$Site)[levels(alphadf$Site)=="MinD-A"] <- "MIN-A"
+levels(alphadf$Site)[levels(alphadf$Site)=="MinD-C"] <- "MIN-C"
+
+alphadf <- alphadf[,c("q0","q0.5","q1","q2","qInf","Site")] ## select only columns with qs of main interest 
+#DB_merge3 <- merge(DB_merge2,alphadf,by="Site") # join with main df
 
 ## to get estimate alpha diversity at equal sample sizes and get estimate uncertainty used iNEXT with bootstrapping
 m <- c(50, 100, 200,300,400,500,600) # series of sample sizes for extrapolation 
@@ -154,6 +232,9 @@ EstIn <- Ests[Ests$order==Inf,4]
 Est_eqSS <- as.data.frame(cbind(Site=as.character(Site),Est0_ss=as.numeric(Est0),Est1_ss=as.numeric(Est1),Est2_ss=as.numeric(Est2),EstInf_ss=as.numeric(EstIn)))
 # 
 #write.csv(Est_eqSS,"C://Data/PhD/Processed_data/Dungbeetles/db_inext_Ests_EqSS.csv")
+#DB_merge4 <- merge(DB_merge3,Est_eqSS,by="Site") # join with main df
+#write.csv(DB_merge4,"C://Data/PhD/Processed_data/Dungbeetles/db_mergedata4.csv")
+
 
 ## Permutation for estimated diversity ----
 ## rescramble data and see what proportion of runs the correlation will be found
@@ -206,6 +287,8 @@ pvals_perm
 # pq0        pq1       pq2      pqlog
 # 0.01029897 0.07649235 0.2748725 0.03559644
 
+
+
 ##//////////
 ## Makes sense up to this line. ----
 ##//////////
@@ -235,66 +318,6 @@ dev.off()
 
 
 
-
-## Read in all datasets and combine ----
-
-# #
-weather <- read.csv("C://Data/PhD/Processed_data/Dungbeetles/DB_div_weather.csv")
-veg <- read.csv("C://Data/PhD/Processed_data/Vegetation/veg_pca_out.csv") 
-alpha <- read.csv("C://Data/PhD/Processed_data/Dungbeetles/Diversity/alpha.csv")
-site_data <- read.csv("C://Data/PhD/Processed_data/Site_data/sites_elev_dist_coords.csv")
-abund <- read.csv("C://Data/PhD/Processed_data/Dungbeetles/DB_Abund_groups.csv")
-soil <- read.csv("C://Data/PhD/Processed_data/Soil/Soil_data.csv")
-estalpha <- read.csv("C://Data/PhD/Processed_data/Dungbeetles/db_inext_Ests_EqSS.csv")## needs incorporating
-head(abund)
-abund <- abund[,-1]
-head(weather)
-head(veg)
-head(alpha)
-head(site_data)
-head(rich)
-head(soil)
-head(Estqs)
-#
-
-# Edited alpha file in Excel to separate Site_rank into rank and site columns
-# Also edited richness output to replace spaces with underscores and remove % and () from colnames
-colnames(weather)[1] <- "Site"
-colnames(veg)[1] <- "Site"
-colnames(rich)[1] <- "Site"
-colnames(alpha)[1] <- "Site"
-
-newalphasite <- str_split_fixed(alpha$Site, ".",3) # split Site column, to get site values without Rank. infront
-alpha$Site <- newalphasite[,3]
-#
-alpha$Site <- as.factor(alpha$Site)
-levels(alpha$Site)
-levels(alpha$Site)[levels(alpha$Site)=="MinD-B"] <- "MIN-B"
-levels(alpha$Site)[levels(alpha$Site)=="MinD-A"] <- "MIN-A"
-levels(alpha$Site)[levels(alpha$Site)=="MinD-C"] <- "MIN-C"
-
-levels(weather$Site)[levels(weather$Site)=="T6-850"] <- "MIN-B"
-levels(weather$Site)[levels(weather$Site)=="T7-1350"] <- "MIN-A"
-levels(weather$Site)[levels(weather$Site)=="CH-400"] <- "MIN-C"
-levels(weather$Site)[levels(weather$Site)=="T1-650"] <- "CCR-B"
-levels(weather$Site)[levels(weather$Site)=="T2-800"] <- "CCR-A"
-levels(weather$Site)[levels(weather$Site)=="T5-250"] <- "CCR-C"
-levels(weather$Site)[levels(weather$Site)=="T2-2150"] <- "MXD-A"
-levels(weather$Site)[levels(weather$Site)=="T10-100"] <- "MXD-B"
-levels(weather$Site)[levels(weather$Site)=="T3-1800"] <- "MXD-C"
-
-#
-#
-DB_merge1 <- merge(alpha,site_data,by="Site")
-DB_merge2 <- merge(DB_merge1,veg,by="Site")
-DB_merge3 <- merge(DB_merge2,weather,by="Site")
-DB_merge4 <- merge(DB_merge3,abund,by="Site")
-DB_merge5 <- merge(DB_merge4,soil,by="Site")
-DB_merge6 <- merge(DB_merge5,Estqs,by="Site")
-DB_allvars <- merge(DB_merge6,rich,by="Site")
-
-head(DB_allvars)
-write.csv(DB_allvars,"C://Data/PhD/Processed_data/Dungbeetles/DB_div_allvars.csv")
 
 
 ####//////////////////
